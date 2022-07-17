@@ -180,7 +180,7 @@ init () =
       , keysPressed = []
       , keyUpChanges = []
       , keyDownChanges = []
-      , flip = True
+      , flip = False
       }
     , Cmd.batch
         [ Browser.Dom.getViewport
@@ -853,9 +853,27 @@ ui =
                 [ let
                     tileSize : Float
                     tileSize =
-                        ((windowHeight |> Pixels.toFloat) - 20) * 0.88 / 32
+                        ((windowHeight |> Pixels.toFloat)
+                            + (case flip of
+                                True ->
+                                    20
+
+                                False ->
+                                    -20
+                              )
+                        )
+                            * 0.88
+                            / 32
                   in
-                  SvgA.transform [ Svg.Scale tileSize tileSize ]
+                  SvgA.transform
+                    [ Svg.Scale tileSize tileSize
+                    , case flip of
+                        True ->
+                            Svg.Scale 1 -1
+
+                        False ->
+                            Svg.Translate 0 0
+                    ]
                 ]
             |> List.singleton
             |> Svg.g
@@ -869,20 +887,6 @@ ui =
                                 |> Quantity.multiplyBy 0.5
                                 |> Pixels.toFloat
                             )
-                        )
-                    ]
-                ]
-            |> List.singleton
-            |> Svg.g
-                [ SvgA.transform
-                    [ Svg.Translate
-                        1
-                        (case flip of
-                            True ->
-                                -1
-
-                            False ->
-                                1
                         )
                     ]
                 ]

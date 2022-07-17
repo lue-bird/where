@@ -6965,16 +6965,17 @@ var $author$project$Game$ui = function (_v0) {
 						$elm_community$typed_svg$TypedSvg$Attributes$transform(
 						_List_fromArray(
 							[
+								A2($elm_community$typed_svg$TypedSvg$Types$Scale, 1, -1),
+								$author$project$Game$translateTo(
 								A2(
-								$elm_community$typed_svg$TypedSvg$Types$Translate,
-								1,
-								function () {
-									if (flip) {
-										return -1;
-									} else {
-										return 1;
-									}
-								}())
+									$ianmackenzie$elm_geometry$Point2d$pixels,
+									$ianmackenzie$elm_units$Pixels$toFloat(
+										A2($ianmackenzie$elm_units$Quantity$multiplyBy, 0.5, windowWidth)),
+									$ianmackenzie$elm_units$Pixels$toFloat(
+										A2(
+											$ianmackenzie$elm_units$Quantity$multiplyBy,
+											0.5,
+											$ianmackenzie$elm_units$Quantity$negate(windowHeight)))))
 							]))
 					]),
 				$elm$core$List$singleton(
@@ -6982,53 +6983,45 @@ var $author$project$Game$ui = function (_v0) {
 						$elm_community$typed_svg$TypedSvg$g,
 						_List_fromArray(
 							[
-								$elm_community$typed_svg$TypedSvg$Attributes$transform(
-								_List_fromArray(
-									[
-										A2($elm_community$typed_svg$TypedSvg$Types$Scale, 1, -1),
-										$author$project$Game$translateTo(
-										A2(
-											$ianmackenzie$elm_geometry$Point2d$pixels,
-											$ianmackenzie$elm_units$Pixels$toFloat(
-												A2($ianmackenzie$elm_units$Quantity$multiplyBy, 0.5, windowWidth)),
-											$ianmackenzie$elm_units$Pixels$toFloat(
-												A2(
-													$ianmackenzie$elm_units$Quantity$multiplyBy,
-													0.5,
-													$ianmackenzie$elm_units$Quantity$negate(windowHeight)))))
-									]))
+								function () {
+								var tileSize = (($ianmackenzie$elm_units$Pixels$toFloat(windowHeight) + function () {
+									if (flip) {
+										return 20;
+									} else {
+										return -20;
+									}
+								}()) * 0.88) / 32;
+								return $elm_community$typed_svg$TypedSvg$Attributes$transform(
+									_List_fromArray(
+										[
+											A2($elm_community$typed_svg$TypedSvg$Types$Scale, tileSize, tileSize),
+											function () {
+											if (flip) {
+												return A2($elm_community$typed_svg$TypedSvg$Types$Scale, 1, -1);
+											} else {
+												return A2($elm_community$typed_svg$TypedSvg$Types$Translate, 0, 0);
+											}
+										}()
+										]));
+							}()
 							]),
-						$elm$core$List$singleton(
-							A2(
+						_List_fromArray(
+							[
+								$author$project$Game$sceneUi(scene),
+								A2(
 								$elm_community$typed_svg$TypedSvg$g,
 								_List_fromArray(
 									[
-										function () {
-										var tileSize = (($ianmackenzie$elm_units$Pixels$toFloat(windowHeight) - 20) * 0.88) / 32;
-										return $elm_community$typed_svg$TypedSvg$Attributes$transform(
-											_List_fromArray(
-												[
-													A2($elm_community$typed_svg$TypedSvg$Types$Scale, tileSize, tileSize)
-												]));
-									}()
-									]),
-								_List_fromArray(
-									[
-										$author$project$Game$sceneUi(scene),
-										A2(
-										$elm_community$typed_svg$TypedSvg$g,
+										$elm_community$typed_svg$TypedSvg$Attributes$transform(
 										_List_fromArray(
 											[
-												$elm_community$typed_svg$TypedSvg$Attributes$transform(
-												_List_fromArray(
-													[
-														$author$project$Game$translateTo(playerPosition)
-													]))
-											]),
-										$elm$core$List$singleton(
-											$author$project$Game$playerUi(
-												{speed: playerSpeed, warmUp: playerWarmUp})))
-									])))))),
+												$author$project$Game$translateTo(playerPosition)
+											]))
+									]),
+								$elm$core$List$singleton(
+									$author$project$Game$playerUi(
+										{speed: playerSpeed, warmUp: playerWarmUp})))
+							])))),
 				A2(
 				$elm_community$typed_svg$TypedSvg$g,
 				_List_Nil,
@@ -7609,7 +7602,7 @@ var $ianmackenzie$elm_units$Duration$second = $ianmackenzie$elm_units$Duration$s
 var $author$project$Game$init = function (_v0) {
 	return _Utils_Tuple2(
 		{
-			flip: true,
+			flip: false,
 			keyDownChanges: _List_Nil,
 			keyUpChanges: _List_Nil,
 			keysPressed: _List_Nil,
