@@ -7,7 +7,7 @@ Collecting changes the game rules.
 
 Made for GMTK Game Jam 2022
 on the theme "roll of the dice"
-(though i was too dumb to submit)
+(though i was too dumb to remember submitting)
 
 > incomplete
 
