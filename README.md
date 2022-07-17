@@ -1,24 +1,17 @@
 # dice hunt
 
-GMTK Game Jam 2022 submission
-on the theme "roll of the dice"
+**[play](https://lue-bird.github.io/gmtk-2022/)**
 
-world made of dices
-and you have to collect them
-while every collected dice
-changes the game rules without telling you
-reach the end as fast as possible
-  - upside down
-  - swapped controls
-  - slippery controls
-  - speed boost
-  - switched dice positions
-  - new terrain
-  - more obstacles (traps, spikes, ...)
-  - wind
-  - available tools (bombs, shovel)
+Find dices throughout the world, collect them as fast as possible.
+Collecting changes the game rules.
+
+Made for GMTK Game Jam 2022
+on the theme "roll of the dice"
+(though i was too dumb to submit)
 
 > incomplete
+
+**[play](https://lue-bird.github.io/gmtk-2022/)**
 
 ### run locally
 

@@ -79,6 +79,19 @@ type alias Model =
         , keysPressed : List Key
         , keyUpChanges : List Key
         , keyDownChanges : List Key
+
+        -- changed by dice roll
+        {-
+           - upside down
+           - swapped controls
+           - slippery controls
+           - speed boost
+           - switched dice positions
+           - new terrain
+           - more obstacles (traps, spikes, ...)
+           - whether, wind
+           - available tools (bombs, shovel)
+        -}
         , flip : Bool
         }
 
