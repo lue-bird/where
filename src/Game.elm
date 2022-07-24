@@ -266,29 +266,80 @@ keysYDirection =
 playerPositionIndexInScene :
     Point2d Pixels Float
     ->
-        { x :
+        { xLeft :
             Result
                 (N.BelowOrAbove Int (N (N.Min N64)))
                 (N (In N0 N63 {}))
-        , y :
+        , xRight :
+            Result
+                (N.BelowOrAbove Int (N (N.Min N64)))
+                (N (In N0 N63 {}))
+        , yLow :
+            Result
+                (N.BelowOrAbove Int (N (N.Min N32)))
+                (N (In N0 N31 {}))
+        , yHigh :
+            Result
+                (N.BelowOrAbove Int (N (N.Min N32)))
+                (N (In N0 N31 {}))
+        , yRound :
             Result
                 (N.BelowOrAbove Int (N (N.Min N32)))
                 (N (In N0 N31 {}))
         }
 playerPositionIndexInScene =
     \playerPosition ->
-        { x =
-            (playerPosition
+        { xLeft =
+            (((playerPosition
                 |> Point2d.xCoordinate
                 |> Pixels.toFloat
-                |> round
+              )
+                - 0.5
+             )
+                |> floor
             )
                 + 32
                 |> N.intIsIn ( n0, n63 )
-        , y =
-            (playerPosition
+        , xRight =
+            (((playerPosition
+                |> Point2d.xCoordinate
+                |> Pixels.toFloat
+              )
+                + 0.5
+             )
+                |> floor
+            )
+                + 32
+                |> N.intIsIn ( n0, n63 )
+        , yLow =
+            (((playerPosition
                 |> Point2d.yCoordinate
                 |> Pixels.toFloat
+              )
+                - 0.5
+             )
+                |> floor
+            )
+                + 16
+                |> N.intIsIn ( n0, n31 )
+        , yHigh =
+            (((playerPosition
+                |> Point2d.yCoordinate
+                |> Pixels.toFloat
+              )
+                + 0.5
+             )
+                |> floor
+            )
+                + 16
+                |> N.intIsIn ( n0, n31 )
+        , yRound =
+            (((playerPosition
+                |> Point2d.yCoordinate
+                |> Pixels.toFloat
+              )
+                - 0.5
+             )
                 |> round
             )
                 + 16
@@ -349,14 +400,14 @@ reactTo event =
         AnimationFramePassed { delta } ->
             \current ->
                 let
-                    playerFutureIndexInScene =
+                    playerIndexInSceneFuture =
                         current.playerPosition
                             |> Point2d.translateBy
                                 (current.playerSpeed |> Vector2d.for (Duration.seconds 0.055))
                             |> playerPositionIndexInScene
 
-                    isBelowScene =
-                        case playerFutureIndexInScene.y of
+                    willBeBelowScene =
+                        case playerIndexInSceneFuture.yLow of
                             Ok _ ->
                                 False
 
@@ -368,56 +419,43 @@ reactTo event =
 
                     willCollideBelow : Maybe TileCollidable
                     willCollideBelow =
-                        case ( playerFutureIndexInScene.x, playerFutureIndexInScene.y ) of
-                            ( Ok x, Ok y ) ->
-                                case y |> N.isAtLeast n1 of
-                                    Err _ ->
-                                        Nothing
+                        case
+                            ( ( playerIndexInSceneFuture.xLeft, playerIndexInSceneFuture.xRight )
+                            , playerIndexInSceneFuture.yLow
+                            )
+                        of
+                            ( ( Ok xLeft, Ok xRight ), Ok y ) ->
+                                case
+                                    current.scene
+                                        |> ArraySized.element ( Up, xLeft )
+                                        |> ArraySized.element ( Up, y )
+                                of
+                                    Collidable collidable ->
+                                        Just collidable
 
-                                    Ok indexInSceneYAtLeast1 ->
+                                    Air _ ->
                                         current.scene
-                                            |> ArraySized.element ( Up, x )
-                                            |> ArraySized.element
-                                                ( Up
-                                                , indexInSceneYAtLeast1 |> N.minSub n1
-                                                )
-                                            |> tileIsCollidable
-
-                            ( _, _ ) ->
-                                Nothing
-
-                    willCollideRight : Maybe TileCollidable
-                    willCollideRight =
-                        case ( playerFutureIndexInScene.x, playerFutureIndexInScene.y ) of
-                            ( Ok x, Ok y ) ->
-                                case x |> N.add n1 |> N.isAtMost n62 of
-                                    Err _ ->
-                                        Nothing
-
-                                    Ok notQuiteRight ->
-                                        current.scene
-                                            |> ArraySized.element
-                                                ( Up, notQuiteRight |> N.add n1 )
+                                            |> ArraySized.element ( Up, xRight )
                                             |> ArraySized.element ( Up, y )
                                             |> tileIsCollidable
 
                             ( _, _ ) ->
                                 Nothing
 
-                    willCollideLeft : Maybe TileCollidable
-                    willCollideLeft =
-                        case ( playerFutureIndexInScene.x, playerFutureIndexInScene.y ) of
-                            ( Ok x, Ok y ) ->
-                                case x |> N.isAtLeast n1 of
-                                    Err _ ->
-                                        Nothing
+                    playerIndexInSceneCurrent =
+                        current.playerPosition |> playerPositionIndexInScene
 
-                                    Ok notQuiteLeft ->
-                                        current.scene
-                                            |> ArraySized.element
-                                                ( Up, notQuiteLeft |> N.minSub n1 )
-                                            |> ArraySized.element ( Up, y )
-                                            |> tileIsCollidable
+                    xCollide xAccess =
+                        case
+                            ( playerIndexInSceneFuture |> xAccess
+                            , playerIndexInSceneCurrent.yRound
+                            )
+                        of
+                            ( Ok x, Ok yRound ) ->
+                                current.scene
+                                    |> ArraySized.element ( Up, x )
+                                    |> ArraySized.element ( Up, yRound )
+                                    |> tileIsCollidable
 
                             ( _, _ ) ->
                                 Nothing
@@ -477,28 +515,31 @@ reactTo event =
                     playerSpeedUpdated =
                         current.playerSpeed
                             |> (case willCollideBelow of
+                                    Just _ ->
+                                        vector2dMapY
+                                            (Quantity.abs
+                                                >> Quantity.multiplyBy 0.6
+                                            )
+
                                     Nothing ->
                                         Vector2d.plus
                                             (gravity |> Vector2d.for delta)
-                                            >> (case willCollideLeft of
-                                                    Nothing ->
-                                                        identity
-
-                                                    Just _ ->
-                                                        vector2dMapX (Quantity.abs >> Quantity.multiplyBy 0.6)
-                                               )
-                                            >> (case willCollideRight of
-                                                    Nothing ->
-                                                        identity
-
-                                                    Just _ ->
-                                                        vector2dMapX (Quantity.abs >> Quantity.multiplyBy -0.6)
-                                               )
+                               )
+                            |> (case xCollide .xLeft of
+                                    Nothing ->
+                                        identity
 
                                     Just _ ->
-                                        vector2dMapY
-                                            (Quantity.minus (Pixels.float 2 |> Quantity.per Duration.second)
-                                                >> Quantity.multiplyBy -0.6
+                                        vector2dMapX Quantity.abs
+                               )
+                            |> (case xCollide .xRight of
+                                    Nothing ->
+                                        identity
+
+                                    Just _ ->
+                                        vector2dMapX
+                                            (Quantity.abs
+                                                >> Quantity.negate
                                             )
                                )
                             |> vector2dMapX
@@ -548,8 +589,13 @@ reactTo event =
                             |> updatedMoveY.speed
 
                     onDice =
-                        case ( playerFutureIndexInScene.x, playerFutureIndexInScene.y ) of
-                            ( Ok x, Ok y ) ->
+                        -- TODO: check xRight
+                        case
+                            ( playerIndexInSceneFuture.xLeft
+                            , playerIndexInSceneFuture.yLow
+                            )
+                        of
+                            ( Ok xLeft, Ok y ) ->
                                 case y |> N.isAtLeast n1 of
                                     Err _ ->
                                         { scene = current.scene
@@ -559,7 +605,7 @@ reactTo event =
                                     Ok notQuiteLowest ->
                                         { scene =
                                             current.scene
-                                                |> ArraySized.elementAlter ( Up, x )
+                                                |> ArraySized.elementAlter ( Up, xLeft )
                                                     (ArraySized.elementAlter
                                                         ( Up, notQuiteLowest |> N.sub n1 )
                                                         (\tile ->
@@ -575,7 +621,7 @@ reactTo event =
                                             current.flip
                                                 |> (case
                                                         current.scene
-                                                            |> ArraySized.element ( Up, x )
+                                                            |> ArraySized.element ( Up, xLeft )
                                                             |> ArraySized.element
                                                                 ( Up, notQuiteLowest |> N.minSub n1 )
                                                     of
@@ -596,38 +642,39 @@ reactTo event =
                     { current
                         | playerWarmUp = updatedMoveY.warmUp
                         , playerPosition =
-                            if isBelowScene then
+                            if willBeBelowScene then
                                 Point2d.fromRecord Pixels.float { x = 0, y = 37 }
 
                             else
                                 current.playerPosition
                                     |> (case willCollideBelow of
                                             Nothing ->
-                                                (case willCollideLeft of
-                                                    Nothing ->
-                                                        identity
-
-                                                    Just _ ->
-                                                        point2dMapX
-                                                            (Quantity.floor
-                                                                >> Quantity.toFloatQuantity
-                                                                >> Quantity.plus (Pixels.float 0.5)
-                                                            )
-                                                )
-                                                    >> (case willCollideRight of
-                                                            Nothing ->
-                                                                identity
-
-                                                            Just _ ->
-                                                                point2dMapX
-                                                                    (Quantity.ceiling
-                                                                        >> Quantity.toFloatQuantity
-                                                                        >> Quantity.minus (Pixels.float 0.5)
-                                                                    )
-                                                       )
+                                                identity
 
                                             Just _ ->
                                                 point2dMapY
+                                                    (Quantity.ceiling
+                                                        >> Quantity.toFloatQuantity
+                                                        >> Quantity.minus (Pixels.float 0.5)
+                                                    )
+                                       )
+                                    |> (case xCollide .xLeft of
+                                            Nothing ->
+                                                identity
+
+                                            Just _ ->
+                                                point2dMapX
+                                                    (Quantity.floor
+                                                        >> Quantity.toFloatQuantity
+                                                        >> Quantity.plus (Pixels.float 0.5)
+                                                    )
+                                       )
+                                    |> (case xCollide .xRight of
+                                            Nothing ->
+                                                identity
+
+                                            Just _ ->
+                                                point2dMapX
                                                     (Quantity.ceiling
                                                         >> Quantity.toFloatQuantity
                                                         >> Quantity.minus (Pixels.float 0.5)
@@ -986,14 +1033,39 @@ playerUi { warmUp, speed } =
     in
     [ arm { x = 0.5 }
     , arm { x = -0.5 }
-    , Svg.ellipse
-        [ SvgA.fill (Svg.Paint bodyColor)
-        , SvgA.rx (Svg.px (stretch |> Vector2d.xComponent |> Quantity.toFloat))
-        , SvgA.ry (Svg.px (stretch |> Vector2d.yComponent |> Quantity.toFloat))
-        , SvgA.cx (Svg.px 0)
-        , SvgA.cy (Svg.px 0)
+    , let
+        height =
+            (stretch |> Vector2d.yComponent |> Quantity.toFloat) * 2
+
+        width =
+            (stretch |> Vector2d.xComponent |> Quantity.toFloat) * 2
+      in
+      Svg.rect
+        [ SvgA.width (Svg.px width)
+        , SvgA.height (Svg.px height)
+        , SvgA.x (Svg.px (-width / 2))
+        , SvgA.y (Svg.px (-height / 2))
+        , SvgA.fill (Svg.Paint bodyColor)
         ]
         []
+
+    {- Svg.path
+       [ [ Svg.PathD.M ( width * 0.25, height / 2 )
+
+         --, Svg.PathD.L ( width / 2, -height * 0.5 )
+         --, Svg.PathD.L ( -width / 2, -height * 0.5 )
+         , Svg.PathD.Q ( width / 2, -height * 0.5 ) ( 0, -height * 0.5 )
+         , Svg.PathD.Q ( -width / 2, -height * 0.5 ) ( -width * 0.25, height / 2 )
+         , Svg.PathD.Z
+         ]
+           |> Svg.PathD.pathD
+           |> SvgA.path
+       , SvgA.fill (Svg.Paint bodyColor)
+       , SvgA.stroke (Svg.Paint bodyColor)
+       , SvgA.strokeWidth (Svg.px 10)
+       ]
+       []
+    -}
     , eye { x = 0.3 }
     , eye { x = -0.3 }
     ]
