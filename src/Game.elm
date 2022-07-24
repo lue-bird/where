@@ -93,13 +93,7 @@ type alias Model =
            - available tools (bombs, shovel)
         -}
         , flip : Bool
-        }
-
-
-type alias SceneInteractionPart =
-    RecordWithoutConstructorFunction
-        { kind : Tile
-        , position : Point2d Pixels Float
+        , lives : Int
         }
 
 
@@ -194,6 +188,7 @@ init () =
       , keyUpChanges = []
       , keyDownChanges = []
       , flip = False
+      , lives = 1
       }
     , Cmd.batch
         [ Browser.Dom.getViewport
@@ -417,8 +412,13 @@ reactTo event =
                             Err (N.Below _) ->
                                 True
 
-                    willCollideBelow : Maybe TileCollidable
-                    willCollideBelow =
+                    belowCollide :
+                        Maybe
+                            { tile : TileCollidable
+                            , x : N (In N0 N63 {})
+                            , y : N (In N0 N31 {})
+                            }
+                    belowCollide =
                         case
                             ( ( playerIndexInSceneFuture.xLeft, playerIndexInSceneFuture.xRight )
                             , playerIndexInSceneFuture.yLow
@@ -431,13 +431,21 @@ reactTo event =
                                         |> ArraySized.element ( Up, y )
                                 of
                                     Collidable collidable ->
-                                        Just collidable
+                                        { tile = collidable, x = xLeft, y = y }
+                                            |> Just
 
                                     Air _ ->
                                         current.scene
                                             |> ArraySized.element ( Up, xRight )
                                             |> ArraySized.element ( Up, y )
                                             |> tileIsCollidable
+                                            |> Maybe.map
+                                                (\tile ->
+                                                    { tile = tile
+                                                    , x = xRight
+                                                    , y = y
+                                                    }
+                                                )
 
                             ( _, _ ) ->
                                 Nothing
@@ -484,7 +492,7 @@ reactTo event =
                                 }
 
                             tryJump =
-                                case willCollideBelow of
+                                case belowCollide of
                                     Nothing ->
                                         { warmUp = current.playerWarmUp
                                         , speed = identity
@@ -505,25 +513,22 @@ reactTo event =
                             Just Down ->
                                 maybeWarmUp
 
-                            Just Up ->
-                                tryJump
-
-                            Nothing ->
+                            _ ->
                                 tryJump
 
                     playerSpeedUpdated : Vector2d (Rate Pixels Seconds) Float
                     playerSpeedUpdated =
                         current.playerSpeed
-                            |> (case willCollideBelow of
+                            |> (case belowCollide of
+                                    Nothing ->
+                                        Vector2d.plus
+                                            (gravity |> Vector2d.for delta)
+
                                     Just _ ->
                                         vector2dMapY
                                             (Quantity.abs
                                                 >> Quantity.multiplyBy 0.6
                                             )
-
-                                    Nothing ->
-                                        Vector2d.plus
-                                            (gravity |> Vector2d.for delta)
                                )
                             |> (case xCollide .xLeft of
                                     Nothing ->
@@ -588,54 +593,28 @@ reactTo event =
                                )
                             |> updatedMoveY.speed
 
-                    onDice =
-                        -- TODO: check xRight
-                        case
-                            ( playerIndexInSceneFuture.xLeft
-                            , playerIndexInSceneFuture.yLow
-                            )
-                        of
-                            ( Ok xLeft, Ok y ) ->
-                                case y |> N.isAtLeast n1 of
-                                    Err _ ->
-                                        { scene = current.scene
-                                        , flip = current.flip
-                                        }
+                    dig : { scene : Scene, dice : Int }
+                    dig =
+                        case belowCollide of
+                            Just belowCollision ->
+                                { scene =
+                                    current.scene
+                                        |> ArraySized.elementAlter ( Up, belowCollision.x )
+                                            (ArraySized.elementAlter ( Up, belowCollision.y )
+                                                (\_ -> Air ())
+                                            )
+                                , dice =
+                                    case belowCollision.tile of
+                                        Dice () ->
+                                            1
 
-                                    Ok notQuiteLowest ->
-                                        { scene =
-                                            current.scene
-                                                |> ArraySized.elementAlter ( Up, xLeft )
-                                                    (ArraySized.elementAlter
-                                                        ( Up, notQuiteLowest |> N.sub n1 )
-                                                        (\tile ->
-                                                            case tile of
-                                                                Collidable (Dice ()) ->
-                                                                    Air ()
+                                        _ ->
+                                            0
+                                }
 
-                                                                _ ->
-                                                                    tile
-                                                        )
-                                                    )
-                                        , flip =
-                                            current.flip
-                                                |> (case
-                                                        current.scene
-                                                            |> ArraySized.element ( Up, xLeft )
-                                                            |> ArraySized.element
-                                                                ( Up, notQuiteLowest |> N.minSub n1 )
-                                                    of
-                                                        Collidable (Dice ()) ->
-                                                            not
-
-                                                        _ ->
-                                                            identity
-                                                   )
-                                        }
-
-                            ( _, _ ) ->
+                            Nothing ->
                                 { scene = current.scene
-                                , flip = current.flip
+                                , dice = 0
                                 }
                 in
                 Step.to
@@ -647,7 +626,7 @@ reactTo event =
 
                             else
                                 current.playerPosition
-                                    |> (case willCollideBelow of
+                                    |> (case belowCollide of
                                             Nothing ->
                                                 identity
 
@@ -685,8 +664,10 @@ reactTo event =
                                             |> Vector2d.for delta
                                         )
                         , playerSpeed = playerSpeedUpdated
-                        , scene = onDice.scene
-                        , flip = onDice.flip
+                        , scene = dig.scene
+                        , flip =
+                            List.repeat dig.dice not
+                                |> List.foldl (\f -> f) current.flip
                         , keyUpChanges =
                             current.keyUpChanges
                                 |> List.filterMap
@@ -1035,37 +1016,17 @@ playerUi { warmUp, speed } =
     , arm { x = -0.5 }
     , let
         height =
-            (stretch |> Vector2d.yComponent |> Quantity.toFloat) * 2
+            stretch |> Vector2d.yComponent |> Quantity.toFloat
 
         width =
-            (stretch |> Vector2d.xComponent |> Quantity.toFloat) * 2
+            stretch |> Vector2d.xComponent |> Quantity.toFloat
       in
-      Svg.rect
-        [ SvgA.width (Svg.px width)
-        , SvgA.height (Svg.px height)
-        , SvgA.x (Svg.px (-width / 2))
-        , SvgA.y (Svg.px (-height / 2))
+      Svg.ellipse
+        [ SvgA.rx (Svg.px width)
+        , SvgA.ry (Svg.px height)
         , SvgA.fill (Svg.Paint bodyColor)
         ]
         []
-
-    {- Svg.path
-       [ [ Svg.PathD.M ( width * 0.25, height / 2 )
-
-         --, Svg.PathD.L ( width / 2, -height * 0.5 )
-         --, Svg.PathD.L ( -width / 2, -height * 0.5 )
-         , Svg.PathD.Q ( width / 2, -height * 0.5 ) ( 0, -height * 0.5 )
-         , Svg.PathD.Q ( -width / 2, -height * 0.5 ) ( -width * 0.25, height / 2 )
-         , Svg.PathD.Z
-         ]
-           |> Svg.PathD.pathD
-           |> SvgA.path
-       , SvgA.fill (Svg.Paint bodyColor)
-       , SvgA.stroke (Svg.Paint bodyColor)
-       , SvgA.strokeWidth (Svg.px 10)
-       ]
-       []
-    -}
     , eye { x = 0.3 }
     , eye { x = -0.3 }
     ]
