@@ -30,7 +30,7 @@ import Length exposing (Meters)
 import LineSegment2d exposing (LineSegment2d)
 import Linear exposing (DirectionLinear(..))
 import List.Extra as List
-import N exposing (Exactly, In, N, N0, n0, n1)
+import N exposing (Exactly, Fixed, In, Min, N, N0, n0, n1, n2, n3)
 import Ns exposing (N31, N32, N63, N64, n31, n32, n62, n63, n64)
 import Pixels exposing (Pixels, PixelsPerSecond)
 import Point2d exposing (Point2d)
@@ -82,18 +82,14 @@ type alias Model =
 
         -- changed by dice roll
         {-
-           - upside down
-           - swapped controls
-           - slippery controls
-           - speed boost
+           - change controls (slippery, speed boost, ...)
            - switched dice positions
-           - new terrain
-           - more obstacles (traps, spikes, ...)
+           - new terrain, more obstacles (traps, spikes, ...)
            - whether, wind
-           - available tools (bombs, shovel)
         -}
         , flip : Bool
         , lives : Int
+        , shovel : Shovel
         }
 
 
@@ -162,10 +158,9 @@ type Event
 
 sceneAir : Scene
 sceneAir =
-    ArraySized.repeat n64
-        (ArraySized.repeat n32
-            (Air ())
-        )
+    ArraySized.repeat
+        (ArraySized.repeat (Air ()) n32)
+        n64
 
 
 init : () -> ( Model, Cmd Event )
@@ -188,7 +183,8 @@ init () =
       , keyUpChanges = []
       , keyDownChanges = []
       , flip = False
-      , lives = 1
+      , lives = 5 -- TODO 1
+      , shovel = Block
       }
     , Cmd.batch
         [ Browser.Dom.getViewport
@@ -263,24 +259,24 @@ playerPositionIndexInScene :
     ->
         { xLeft :
             Result
-                (N.BelowOrAbove Int (N (N.Min N64)))
-                (N (In N0 N63 {}))
+                (N.BelowOrAbove Int (N (Min (Fixed N64))))
+                (N (In (Fixed N0) (Fixed N63)))
         , xRight :
             Result
-                (N.BelowOrAbove Int (N (N.Min N64)))
-                (N (In N0 N63 {}))
+                (N.BelowOrAbove Int (N (Min (Fixed N64))))
+                (N (In (Fixed N0) (Fixed N63)))
         , yLow :
             Result
-                (N.BelowOrAbove Int (N (N.Min N32)))
-                (N (In N0 N31 {}))
+                (N.BelowOrAbove Int (N (Min (Fixed N32))))
+                (N (In (Fixed N0) (Fixed N31)))
         , yHigh :
             Result
-                (N.BelowOrAbove Int (N (N.Min N32)))
-                (N (In N0 N31 {}))
+                (N.BelowOrAbove Int (N (Min (Fixed N32))))
+                (N (In (Fixed N0) (Fixed N31)))
         , yRound :
             Result
-                (N.BelowOrAbove Int (N (N.Min N32)))
-                (N (In N0 N31 {}))
+                (N.BelowOrAbove Int (N (Min (Fixed N32))))
+                (N (In (Fixed N0) (Fixed N31)))
         }
 playerPositionIndexInScene =
     \playerPosition ->
@@ -415,8 +411,8 @@ reactTo event =
                     belowCollide :
                         Maybe
                             { tile : TileCollidable
-                            , x : N (In N0 N63 {})
-                            , y : N (In N0 N31 {})
+                            , x : N (In (Fixed N0) (Fixed N63))
+                            , y : N (In (Fixed N0) (Fixed N31))
                             }
                     belowCollide =
                         case
@@ -592,105 +588,172 @@ reactTo event =
                                                 )
                                )
                             |> updatedMoveY.speed
-
-                    dig : { scene : Scene, dice : Int }
-                    dig =
-                        case belowCollide of
-                            Just belowCollision ->
-                                { scene =
-                                    current.scene
-                                        |> ArraySized.elementAlter ( Up, belowCollision.x )
-                                            (ArraySized.elementAlter ( Up, belowCollision.y )
-                                                (\_ -> Air ())
-                                            )
-                                , dice =
-                                    case belowCollision.tile of
-                                        Dice () ->
-                                            1
-
-                                        _ ->
-                                            0
-                                }
-
-                            Nothing ->
-                                { scene = current.scene
-                                , dice = 0
-                                }
                 in
-                Step.to
-                    { current
-                        | playerWarmUp = updatedMoveY.warmUp
-                        , playerPosition =
-                            if willBeBelowScene then
-                                Point2d.fromRecord Pixels.float { x = 0, y = 37 }
+                current
+                    |> (\r ->
+                            { r
+                                | playerWarmUp = updatedMoveY.warmUp
+                                , playerSpeed = playerSpeedUpdated
+                            }
+                       )
+                    |> (if willBeBelowScene then
+                            \r ->
+                                { r
+                                    | playerPosition =
+                                        Point2d.fromRecord Pixels.float { x = 0, y = 32 }
+                                    , lives = current.lives - 1
+                                }
 
-                            else
-                                current.playerPosition
-                                    |> (case belowCollide of
-                                            Nothing ->
-                                                identity
+                        else
+                            \r ->
+                                { r
+                                    | playerPosition =
+                                        current.playerPosition
+                                            |> (case belowCollide of
+                                                    Nothing ->
+                                                        identity
 
-                                            Just _ ->
-                                                point2dMapY
-                                                    (Quantity.ceiling
-                                                        >> Quantity.toFloatQuantity
-                                                        >> Quantity.minus (Pixels.float 0.5)
-                                                    )
-                                       )
-                                    |> (case xCollide .xLeft of
-                                            Nothing ->
-                                                identity
+                                                    Just _ ->
+                                                        point2dMapY
+                                                            (Quantity.ceiling
+                                                                >> Quantity.toFloatQuantity
+                                                                >> Quantity.minus (Pixels.float 0.5)
+                                                            )
+                                               )
+                                            |> (case xCollide .xLeft of
+                                                    Nothing ->
+                                                        identity
 
-                                            Just _ ->
-                                                point2dMapX
-                                                    (Quantity.floor
-                                                        >> Quantity.toFloatQuantity
-                                                        >> Quantity.plus (Pixels.float 0.5)
-                                                    )
-                                       )
-                                    |> (case xCollide .xRight of
-                                            Nothing ->
-                                                identity
+                                                    Just _ ->
+                                                        point2dMapX
+                                                            (Quantity.floor
+                                                                >> Quantity.toFloatQuantity
+                                                                >> Quantity.plus (Pixels.float 0.5)
+                                                            )
+                                               )
+                                            |> (case xCollide .xRight of
+                                                    Nothing ->
+                                                        identity
 
-                                            Just _ ->
-                                                point2dMapX
-                                                    (Quantity.ceiling
-                                                        >> Quantity.toFloatQuantity
-                                                        >> Quantity.minus (Pixels.float 0.5)
-                                                    )
-                                       )
-                                    |> Point2d.translateBy
-                                        (playerSpeedUpdated
-                                            |> Vector2d.for delta
-                                        )
-                        , playerSpeed = playerSpeedUpdated
-                        , scene = dig.scene
-                        , flip =
-                            List.repeat dig.dice not
-                                |> List.foldl (\f -> f) current.flip
-                        , keyUpChanges =
-                            current.keyUpChanges
-                                |> List.filterMap
-                                    (\key ->
-                                        case [ key ] |> keysXDirection of
-                                            Nothing ->
-                                                key |> Just
+                                                    Just _ ->
+                                                        point2dMapX
+                                                            (Quantity.ceiling
+                                                                >> Quantity.toFloatQuantity
+                                                                >> Quantity.minus (Pixels.float 0.5)
+                                                            )
+                                               )
+                                            |> Point2d.translateBy
+                                                (playerSpeedUpdated
+                                                    |> Vector2d.for delta
+                                                )
+                                }
+                       )
+                    |> (\r ->
+                            let
+                                dig : { scene : Scene, dice : Int }
+                                dig =
+                                    case belowCollide of
+                                        Just belowCollision ->
+                                            { scene =
+                                                case current.shovel of
+                                                    Block ->
+                                                        current.scene
+                                                            |> ArraySized.elementAlter ( Up, belowCollision.x )
+                                                                (ArraySized.elementAlter ( Up, belowCollision.y )
+                                                                    (\_ -> Air ())
+                                                                )
 
-                                            Just _ ->
-                                                Nothing
+                                                    Line ->
+                                                        current.scene
+                                                            |> ArraySized.elementAlter ( Up, belowCollision.x )
+                                                                (ArraySized.elementAlter ( Up, belowCollision.y )
+                                                                    (\_ -> Air ())
+                                                                )
+                                                            |> ArraySized.elementAlter ( Up, belowCollision.x )
+                                                                (ArraySized.elementAlter
+                                                                    ( Up
+                                                                    , belowCollision.y |> N.atLeast n1 |> N.sub n1
+                                                                    )
+                                                                    (\_ -> Air ())
+                                                                )
+                                                            |> ArraySized.elementAlter ( Up, belowCollision.x )
+                                                                (ArraySized.elementAlter
+                                                                    ( Up
+                                                                    , belowCollision.y |> N.atLeast n2 |> N.sub n2
+                                                                    )
+                                                                    (\_ -> Air ())
+                                                                )
+
+                                                    Circle ->
+                                                        current.scene
+                                                            |> ArraySized.elementAlter
+                                                                ( Up
+                                                                , belowCollision.x |> N.atLeast n1 |> N.sub n1
+                                                                )
+                                                                (ArraySized.elementAlter ( Up, belowCollision.y )
+                                                                    (\_ -> Air ())
+                                                                )
+                                                            |> ArraySized.elementAlter ( Up, belowCollision.x )
+                                                                (ArraySized.elementAlter
+                                                                    ( Up
+                                                                    , belowCollision.y |> N.atLeast n1 |> N.sub n1
+                                                                    )
+                                                                    (\_ -> Air ())
+                                                                )
+                                                            |> ArraySized.elementAlter ( Up, belowCollision.x )
+                                                                (ArraySized.elementAlter ( Up, belowCollision.y )
+                                                                    (\_ -> Air ())
+                                                                )
+                                                            |> ArraySized.elementAlter
+                                                                ( Up
+                                                                , belowCollision.x |> N.add n1
+                                                                )
+                                                                (ArraySized.elementAlter ( Up, belowCollision.y )
+                                                                    (\_ -> Air ())
+                                                                )
+                                            , dice =
+                                                case belowCollision.tile of
+                                                    Dice () ->
+                                                        1
+
+                                                    _ ->
+                                                        0
+                                            }
+
+                                        Nothing ->
+                                            { scene = current.scene
+                                            , dice = 0
+                                            }
+
+                                ( randomChanges, seedNew ) =
+                                    case dig.dice of
+                                        0 ->
+                                            ( [], current.seed )
+
+                                        digDice1AtLeast ->
+                                            Random.step
+                                                (Random.list digDice1AtLeast (diceChangeRandom r.shovel))
+                                                current.seed
+                            in
+                            randomChanges
+                                |> List.foldl
+                                    (\randomChange_ ->
+                                        case randomChange_ of
+                                            LiveUp ->
+                                                \m -> { m | lives = m.lives + 1 }
+
+                                            Flip ->
+                                                \m -> { m | flip = m.flip |> not }
+
+                                            ShovelSwap shovelNew ->
+                                                \m -> { m | shovel = shovelNew }
                                     )
-                        , keyDownChanges =
-                            current.keyDownChanges
-                                |> List.filterMap
-                                    (\key ->
-                                        case [ key ] |> keysXDirection of
-                                            Nothing ->
-                                                key |> Just
-
-                                            Just _ ->
-                                                Nothing
-                                    )
-                    }
+                                    { r
+                                        | seed = seedNew
+                                        , scene = dig.scene
+                                    }
+                       )
+                    |> Step.to
 
 
 type alias Scene =
@@ -779,7 +842,7 @@ groundRandom { permutations } =
                                     )
                                 |> (\ground ->
                                         ArraySized.until aboveGroundGrassUpper
-                                            |> ArraySized.map (N.addAtLeast n0 groundYUpper)
+                                            |> ArraySized.map (N.add groundYUpper)
                                             |> ArraySized.foldFrom ground
                                                 Up
                                                 (\y ->
@@ -789,8 +852,7 @@ groundRandom { permutations } =
                                    )
                                 |> (\groundWithGrass ->
                                         ArraySized.until (10 |> noiseInLayer { scale = 1.4 })
-                                            |> ArraySized.map
-                                                (N.addAtLeast n0 groundYUpper)
+                                            |> ArraySized.map (N.add groundYUpper)
                                             |> ArraySized.foldFrom groundWithGrass
                                                 Up
                                                 (\y ->
@@ -815,6 +877,52 @@ groundRandom { permutations } =
                                    )
                         )
                 )
+
+
+type DiceChange
+    = Flip
+    | LiveUp
+    | ShovelSwap Shovel
+
+
+diceChangeRandom : Shovel -> Random.Generator DiceChange
+diceChangeRandom currentShovel =
+    Random.frequency
+        ( 0.2, Random.constant Flip )
+        [ ( 0.2, Random.constant LiveUp )
+        , ( 0.5
+          , Random.constant ShovelSwap
+                |> Random.andMap (shovelRandom currentShovel)
+          )
+        ]
+
+
+type Shovel
+    = Block
+    | Circle
+    | Line
+
+
+shovelRandom : Shovel -> Random.Generator Shovel
+shovelRandom currentShovel =
+    case currentShovel of
+        Block ->
+            Random.weighted
+                ( 0.6, Circle )
+                [ ( 0.4, Line )
+                ]
+
+        Circle ->
+            Random.weighted
+                ( 0.6, Block )
+                [ ( 0.4, Line )
+                ]
+
+        Line ->
+            Random.weighted
+                ( 0.6, Block )
+                [ ( 0.4, Circle )
+                ]
 
 
 warmUpDuration : Duration
@@ -849,7 +957,7 @@ htmlUi =
 
 ui : Model -> Svg event_
 ui =
-    \{ playerPosition, playerSpeed, flip, windowWidth, windowHeight, playerWarmUp, scene } ->
+    \{ playerPosition, playerSpeed, flip, windowWidth, windowHeight, playerWarmUp, shovel, scene, lives } ->
         [ Svg.defs
             []
             [ Svg.radialGradient
@@ -883,7 +991,12 @@ ui =
             ]
             []
         , [ scene |> sceneUi
-          , playerUi { warmUp = playerWarmUp, speed = playerSpeed }
+          , { warmUp = playerWarmUp
+            , speed = playerSpeed
+            , shovel = shovel
+            , lives = lives
+            }
+                |> playerUi
                 |> List.singleton
                 |> Svg.g
                     [ SvgA.transform
@@ -952,85 +1065,144 @@ ui =
                 []
 
 
-playerUi : { warmUp : Progress, speed : Vector2d (Rate Pixels Seconds) Float } -> Svg event_
-playerUi { warmUp, speed } =
-    let
-        after =
-            speed
-                |> Vector2d.for (Duration.seconds 0.15)
+playerUi :
+    { warmUp : Progress
+    , speed : Vector2d (Rate Pixels Seconds) Float
+    , shovel : Shovel
+    , lives : Int
+    }
+    -> Svg event_
+playerUi =
+    \{ warmUp, speed, shovel, lives } ->
+        let
+            after =
+                speed
+                    |> Vector2d.for (Duration.seconds 0.15)
 
-        stretch =
-            Vector2d.unitless 0.37 0.37
-                |> Vector2d.plus
-                    (after
-                        |> Vector2d.normalize
-                        |> vector2dMapX Quantity.abs
-                        |> vector2dMapY Quantity.abs
-                        |> Vector2d.scaleBy
-                            (after
-                                |> Vector2d.length
-                                |> Quantity.min (Pixels.float 0.26)
-                                |> Quantity.max (Pixels.float -0.26)
-                                |> Pixels.toFloat
-                            )
-                    )
+            stretch =
+                Vector2d.unitless 0.37 0.37
+                    |> Vector2d.plus
+                        (after
+                            |> Vector2d.normalize
+                            |> vector2dMapX Quantity.abs
+                            |> vector2dMapY Quantity.abs
+                            |> Vector2d.scaleBy
+                                (after
+                                    |> Vector2d.length
+                                    |> Quantity.min (Pixels.float 0.26)
+                                    |> Quantity.max (Pixels.float -0.26)
+                                    |> Pixels.toFloat
+                                )
+                        )
 
-        beforeY =
-            0.5
-                + (speed
-                    |> Vector2d.for (Duration.seconds -0.1)
-                    |> Vector2d.yComponent
-                    |> Pixels.toFloat
-                    |> min 0.7
-                    |> max -0.7
-                  )
+            beforeY =
+                0.5
+                    + (speed
+                        |> Vector2d.for (Duration.seconds -0.1)
+                        |> Vector2d.yComponent
+                        |> Pixels.toFloat
+                        |> min 0.7
+                        |> max -0.7
+                      )
 
-        bodyColor =
-            rgb
-                (0.2 + 0.8 * (warmUp |> Progress.toFraction))
-                0.4
-                (1 - 0.8 * (warmUp |> Progress.toFraction))
+            bodyColor =
+                rgb
+                    (0.2 + 0.8 * (warmUp |> Progress.toFraction))
+                    0.4
+                    (1 - 0.8 * (warmUp |> Progress.toFraction))
 
-        arm { x } =
-            Svg.polyline
-                [ SvgA.stroke (Svg.Paint bodyColor)
-                , SvgA.strokeWidth (Svg.px 0.41)
-                , SvgA.points
-                    [ ( x * 0.35, 0 )
-                    , ( x, 0.2 + beforeY * 0.6 )
+            arm { x } =
+                Svg.polyline
+                    [ SvgA.stroke (Svg.Paint bodyColor)
+                    , SvgA.strokeWidth (Svg.px 0.41)
+                    , SvgA.points
+                        [ ( x * 0.4, 0 )
+                        , ( x, 0.2 + beforeY * 0.85 )
+                        ]
                     ]
-                ]
-                []
+                    []
 
-        eye { x } =
-            Svg.circle
-                [ SvgA.fill (Svg.Paint (rgba 0.8 1 0.3 0.4))
-                , SvgA.r (Svg.px 0.23)
-                , SvgA.cx (Svg.px x)
-                , SvgA.cy
-                    (Svg.px beforeY)
-                ]
-                []
-    in
-    [ arm { x = 0.5 }
-    , arm { x = -0.5 }
-    , let
-        height =
-            stretch |> Vector2d.yComponent |> Quantity.toFloat
+            shovelUi : Svg event_
+            shovelUi =
+                case shovel of
+                    Block ->
+                        Svg.polygon
+                            [ SvgA.points
+                                [ ( -0.4, 0.33 )
+                                , ( 0, 0 )
+                                , ( 0.4, 0.33 )
+                                ]
+                            , SvgA.fill (Svg.Paint (rgba 0 0 0 0.8))
+                            , SvgA.transform
+                                [ Svg.Translate 0 -0.55 ]
+                            ]
+                            []
 
-        width =
-            stretch |> Vector2d.xComponent |> Quantity.toFloat
-      in
-      Svg.ellipse
-        [ SvgA.rx (Svg.px width)
-        , SvgA.ry (Svg.px height)
-        , SvgA.fill (Svg.Paint bodyColor)
+                    Line ->
+                        Svg.polygon
+                            [ SvgA.points
+                                [ ( -0.13, 0.48 )
+                                , ( -0.13, 0 )
+                                , ( 0.13, 0 )
+                                , ( 0.13, 0.48 )
+                                ]
+                            , SvgA.transform
+                                [ Svg.Translate 0 -0.5 ]
+                            , SvgA.fill (Svg.Paint (rgba 0 0 0 0.8))
+                            ]
+                            []
+
+                    Circle ->
+                        Svg.circle
+                            [ SvgA.fill (Svg.Paint (rgba 0 0 0 0.8))
+                            , SvgA.r (Svg.px 0.35)
+                            , SvgA.transform
+                                [ Svg.Translate 0 -0.2 ]
+                            ]
+                            []
+        in
+        [ arm { x = 0.5 }
+        , arm { x = -0.5 }
+        , let
+            height =
+                stretch |> Vector2d.yComponent |> Quantity.toFloat
+
+            width =
+                stretch |> Vector2d.xComponent |> Quantity.toFloat
+          in
+          Svg.ellipse
+            [ SvgA.rx (Svg.px width)
+            , SvgA.ry (Svg.px height)
+            , SvgA.fill (Svg.Paint bodyColor)
+            ]
+            []
+        , let
+            eye { x, y } =
+                Svg.circle
+                    [ SvgA.fill (Svg.Paint (rgba 0.8 1 0.3 0.9))
+                    , SvgA.r (Svg.px (0.15 + (0.2 / (lives |> toFloat))))
+                    , SvgA.cx (Svg.px x)
+                    , SvgA.cy (Svg.px (beforeY * 0.9 + y))
+                    ]
+                    []
+          in
+          List.range 0 (lives - 1)
+            |> List.map
+                (\life ->
+                    let
+                        toMid =
+                            -(((lives - 1) |> toFloat) / 2)
+                                + (life |> toFloat)
+                    in
+                    eye
+                        { x = 0.6 * cos (turns (0.25 + (toMid / (lives |> toFloat) * 0.5)))
+                        , y = 0.2 * sin (turns (0.25 + (toMid / (lives |> toFloat) * 0.5)))
+                        }
+                )
+            |> Svg.g []
+        , shovelUi
         ]
-        []
-    , eye { x = 0.3 }
-    , eye { x = -0.3 }
-    ]
-        |> Svg.g []
+            |> Svg.g []
 
 
 sceneUi : Scene -> Svg event_
