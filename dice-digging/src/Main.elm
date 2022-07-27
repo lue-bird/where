@@ -1,4 +1,4 @@
-module Game exposing (main)
+module Main exposing (main)
 
 {-| GMTK Game Jam 2022
 
@@ -9,6 +9,8 @@ module Game exposing (main)
   - <https://dark.elm.dmy.fr/packages/Herteby/simplex-noise/latest/>
   - <https://www.youtube.com/watch?v=CoMHkeAXEUY>
   - <https://dark.elm.dmy.fr/packages/xilnocas/step/latest/Step>
+  - elm-optimize-level-2 src/Main.elm --optimize-speed
+      - <https://github.com/mdgriffith/elm-optimize-level-2>
 
 -}
 
@@ -72,7 +74,6 @@ type alias Model =
         , permutations : Simplex.PermutationTable
         , playerPosition : Point2d Pixels Float
         , playerSpeed : Vector2d (Rate Pixels Seconds) Float
-        , playerWarmUp : Progress
         , scene : Scene
         , windowWidth : Quantity Float Pixels
         , windowHeight : Quantity Float Pixels
@@ -175,7 +176,6 @@ init () =
       , playerSpeed =
             Vector2d.pixels 0 0
                 |> Vector2d.per Duration.second
-      , playerWarmUp = Progress.begin
       , scene = sceneAir
       , windowWidth = Pixels.pixels 1920
       , windowHeight = Pixels.pixels 1080
@@ -183,7 +183,7 @@ init () =
       , keyUpChanges = []
       , keyDownChanges = []
       , flip = False
-      , lives = 5 -- TODO 1
+      , lives = 1
       , shovel = Block
       }
     , Cmd.batch
@@ -229,29 +229,35 @@ type XDirection
 keysXDirection : List Key -> Maybe XDirection
 keysXDirection =
     \keys ->
-        case (keys |> Keyboard.Arrows.arrows).x + 1 of
-            0 ->
-                Left |> Just
+        let
+            { x } =
+                keys |> Keyboard.Arrows.arrows
+        in
+        if x == -1 then
+            Left |> Just
 
-            2 ->
-                Right |> Just
+        else if x == 1 then
+            Right |> Just
 
-            _ ->
-                Nothing
+        else
+            Nothing
 
 
 keysYDirection : List Key -> Maybe DirectionLinear
 keysYDirection =
     \keys ->
-        case (keys |> Keyboard.Arrows.arrows).y + 1 of
-            0 ->
-                Down |> Just
+        let
+            { y } =
+                keys |> Keyboard.Arrows.arrows
+        in
+        if y == -1 then
+            Down |> Just
 
-            2 ->
-                Up |> Just
+        else if y == 1 then
+            Up |> Just
 
-            _ ->
-                Nothing
+        else
+            Nothing
 
 
 playerPositionIndexInScene :
@@ -345,8 +351,8 @@ reactTo event =
             \model ->
                 Step.to
                     { model
-                        | windowWidth = size.width
-                        , windowHeight = size.height
+                        | windowWidth = size.width |> Quantity.plus (Pixels.float 16)
+                        , windowHeight = size.height |> Quantity.plus (Pixels.float 16)
                     }
 
         KeyEvent keyEvent ->
@@ -465,45 +471,38 @@ reactTo event =
                                 Nothing
 
                     updatedMoveY :
-                        { warmUp : Progress
-                        , speed :
-                            Vector2d (Rate Pixels Seconds) Float
-                            -> Vector2d (Rate Pixels Seconds) Float
-                        }
+                        Vector2d (Rate Pixels Seconds) Float
+                        -> Vector2d (Rate Pixels Seconds) Float
                     updatedMoveY =
                         let
                             maybeWarmUp =
-                                { warmUp =
-                                    case current.keysPressed |> keysYDirection of
-                                        Just Down ->
-                                            current.playerWarmUp
-                                                |> Progress.by
-                                                    { delta = delta
-                                                    , ready = warmUpDuration
-                                                    }
+                                case current.keysPressed |> keysYDirection of
+                                    Just Down ->
+                                        Vector2d.plus
+                                            (Vector2d.pixels 0 -0.5
+                                                |> Vector2d.per Duration.second
+                                            )
 
-                                        _ ->
-                                            Progress.begin
-                                , speed = identity
-                                }
+                                    Just Up ->
+                                        -- TODO: enable only on dice roll
+                                        Vector2d.plus
+                                            (Vector2d.pixels 0 1
+                                                |> Vector2d.per Duration.second
+                                            )
+
+                                    _ ->
+                                        identity
 
                             tryJump =
                                 case belowCollide of
                                     Nothing ->
-                                        { warmUp = current.playerWarmUp
-                                        , speed = identity
-                                        }
+                                        identity
 
                                     Just _ ->
-                                        { warmUp = Progress.begin
-                                        , speed =
-                                            Vector2d.plus
-                                                (Vector2d.pixels
-                                                    0
-                                                    (7.5 * (current.playerWarmUp |> Progress.toFraction))
-                                                    |> Vector2d.per Duration.second
-                                                )
-                                        }
+                                        Vector2d.plus
+                                            (Vector2d.pixels 0 8
+                                                |> Vector2d.per Duration.second
+                                            )
                         in
                         case current.keysPressed |> keysYDirection of
                             Just Down ->
@@ -587,15 +586,10 @@ reactTo event =
                                                     (Pixels.float 4.9 |> Quantity.per Duration.second)
                                                 )
                                )
-                            |> updatedMoveY.speed
+                            |> updatedMoveY
                 in
                 current
-                    |> (\r ->
-                            { r
-                                | playerWarmUp = updatedMoveY.warmUp
-                                , playerSpeed = playerSpeedUpdated
-                            }
-                       )
+                    |> (\r -> { r | playerSpeed = playerSpeedUpdated })
                     |> (if willBeBelowScene then
                             \r ->
                                 { r
@@ -957,7 +951,7 @@ htmlUi =
 
 ui : Model -> Svg event_
 ui =
-    \{ playerPosition, playerSpeed, flip, windowWidth, windowHeight, playerWarmUp, shovel, scene, lives } ->
+    \{ playerPosition, playerSpeed, flip, windowWidth, windowHeight, shovel, scene, lives } ->
         [ Svg.defs
             []
             [ Svg.radialGradient
@@ -991,8 +985,7 @@ ui =
             ]
             []
         , [ scene |> sceneUi
-          , { warmUp = playerWarmUp
-            , speed = playerSpeed
+          , { speed = playerSpeed
             , shovel = shovel
             , lives = lives
             }
@@ -1066,14 +1059,13 @@ ui =
 
 
 playerUi :
-    { warmUp : Progress
-    , speed : Vector2d (Rate Pixels Seconds) Float
+    { speed : Vector2d (Rate Pixels Seconds) Float
     , shovel : Shovel
     , lives : Int
     }
     -> Svg event_
 playerUi =
-    \{ warmUp, speed, shovel, lives } ->
+    \{ speed, shovel, lives } ->
         let
             after =
                 speed
@@ -1106,10 +1098,7 @@ playerUi =
                       )
 
             bodyColor =
-                rgb
-                    (0.2 + 0.8 * (warmUp |> Progress.toFraction))
-                    0.4
-                    (1 - 0.8 * (warmUp |> Progress.toFraction))
+                rgb 0.2 0.4 1
 
             arm { x } =
                 Svg.polyline

@@ -1,8 +1,8 @@
-# dice hunt
+# dice digging
 
 **[play](https://lue-bird.github.io/gmtk-2022/)**
 
-Find dices throughout the world, collect them as fast as possible.
+Find dices throughout the world, destroy them as fast as possible.
 Collecting changes the game rules.
 
 Made for GMTK Game Jam 2022
@@ -17,7 +17,11 @@ on the theme "roll of the dice"
 
 `clone` the repo, then
 ```
-elm reactor
+npm install
+npm run dev
 ```
-then point your browser to <http://localhost:8000/src/Main.elm>
+then point your browser to <http://localhost:3000>
 
+See
+  - <https://github.com/hmsk/vite-plugin-elm>
+  - based on <https://github.com/lindsaykwardell/vite-elm-template>
