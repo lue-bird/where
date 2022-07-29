@@ -26,6 +26,7 @@ import Direction2d
 import Duration exposing (Duration, Seconds)
 import Html exposing (Html)
 import Html.Attributes as Html
+import Html.Lazy
 import Keyboard exposing (Key, KeyChange(..))
 import Keyboard.Arrows
 import Length exposing (Meters)
@@ -41,12 +42,14 @@ import Progress exposing (Progress(..))
 import Quantity exposing (Quantity, Rate, Unitless, in_)
 import Random
 import Random.Extra as Random
-import Random.List
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
-import Rectangle2d exposing (Rectangle2d)
+import Rectangle2d
 import Simplex
-import Speed exposing (MetersPerSecond, Speed)
+import Speed
+import Stack
 import Step exposing (Step)
+import Svg.Keyed
+import Svg.Lazy as Svg
 import Svg.PathD
 import Task
 import TypedSvg as Svg exposing (svg)
@@ -88,7 +91,7 @@ type alias Model =
            - new terrain, more obstacles (traps, spikes, ...)
            - whether, wind
         -}
-        , flip : Bool
+        , upside : DirectionLinear
         , lives : Int
         , shovel : Shovel
         }
@@ -182,7 +185,7 @@ init () =
       , keysPressed = []
       , keyUpChanges = []
       , keyDownChanges = []
-      , flip = False
+      , upside = Up
       , lives = 1
       , shovel = Block
       }
@@ -737,7 +740,7 @@ reactTo event =
                                                 \m -> { m | lives = m.lives + 1 }
 
                                             Flip ->
-                                                \m -> { m | flip = m.flip |> not }
+                                                \m -> { m | upside = m.upside |> Linear.opposite }
 
                                             ShovelSwap shovelNew ->
                                                 \m -> { m | shovel = shovelNew }
@@ -919,11 +922,6 @@ shovelRandom currentShovel =
                 ]
 
 
-warmUpDuration : Duration
-warmUpDuration =
-    Duration.seconds 0.2
-
-
 gravity : Vector2d (Rate (Rate Pixels Seconds) Seconds) coordinates_
 gravity =
     Vector2d.pixels 0 -18
@@ -934,57 +932,84 @@ gravity =
 htmlUi : Model -> Html Event
 htmlUi =
     \model ->
-        Html.div []
-            [ model
-                |> ui
-                |> List.singleton
-                |> svg
-                    [ SvgA.viewBox
-                        0
-                        0
-                        (model.windowWidth |> Pixels.toFloat)
-                        ((model.windowHeight |> Pixels.toFloat) - 10)
-                    , Html.style "width" "100%"
-                    ]
+        model
+            |> ui
+            |> List.singleton
+            |> svg
+                [ SvgA.viewBox
+                    0
+                    0
+                    (model.windowWidth |> Pixels.toFloat)
+                    ((model.windowHeight |> Pixels.toFloat) - 10)
+                , Html.style "width" "100%"
+                ]
+
+
+background : Svg event_
+background =
+    Svg.rect
+        [ SvgA.fill (Svg.Reference "background")
+        , SvgA.width (Svg.percent 100)
+        , SvgA.height (Svg.percent 100)
+        ]
+        []
+
+
+svgDefinitions =
+    Svg.defs
+        []
+        [ Svg.radialGradient
+            [ SvgA.id "background"
+            , SvgA.r (Svg.percent 150)
             ]
+            [ Svg.stop
+                [ SvgA.offset "37%"
+                , SvgA.stopColor (rgb 0.4 0.5 0.7 |> Color.toCssString)
+                ]
+                []
+            , Svg.stop
+                [ SvgA.offset "100%"
+                , SvgA.stopColor (rgba 0 0 0 0.4 |> Color.toCssString)
+                ]
+                []
+            ]
+        , SvgFilter.gaussianBlur
+            [ SvgA.id "blur"
+            , SvgA.x (Svg.px 0)
+            , SvgA.y (Svg.px 0)
+            , SvgFilterA.in_ Svg.InSourceGraphic
+            , SvgA.stdDeviation "15"
+            ]
+            []
+        ]
+
+
+bars : Svg event_
+bars =
+    [ Svg.rect
+        [ SvgA.fill (Svg.Paint Color.black)
+        , SvgA.width (Svg.percent 100)
+        , SvgA.height (Svg.percent 6)
+        ]
+        []
+    , Svg.rect
+        [ SvgA.fill (Svg.Paint Color.black)
+        , SvgA.width (Svg.percent 100)
+        , SvgA.height (Svg.percent 8)
+        , SvgA.y (Svg.percent 94)
+        ]
+        []
+    ]
+        |> Svg.g
+            []
 
 
 ui : Model -> Svg event_
 ui =
-    \{ playerPosition, playerSpeed, flip, windowWidth, windowHeight, shovel, scene, lives } ->
-        [ Svg.defs
-            []
-            [ Svg.radialGradient
-                [ SvgA.id "background"
-                , SvgA.r (Svg.percent 150)
-                ]
-                [ Svg.stop
-                    [ SvgA.offset "37%"
-                    , SvgA.stopColor (rgb 0.4 0.5 0.7 |> Color.toCssString)
-                    ]
-                    []
-                , Svg.stop
-                    [ SvgA.offset "100%"
-                    , SvgA.stopColor (rgba 0 0 0 0.4 |> Color.toCssString)
-                    ]
-                    []
-                ]
-            , SvgFilter.gaussianBlur
-                [ SvgA.id "blur"
-                , SvgA.x (Svg.px 0)
-                , SvgA.y (Svg.px 0)
-                , SvgFilterA.in_ Svg.InSourceGraphic
-                , SvgA.stdDeviation "15"
-                ]
-                []
-            ]
-        , Svg.rect
-            [ SvgA.fill (Svg.Reference "background")
-            , SvgA.width (Svg.percent 100)
-            , SvgA.height (Svg.percent 100)
-            ]
-            []
-        , [ scene |> sceneUi
+    \{ playerPosition, playerSpeed, upside, windowWidth, windowHeight, shovel, scene, lives } ->
+        [ svgDefinitions
+        , background
+        , [ Svg.lazy sceneUi scene
           , { speed = playerSpeed
             , shovel = shovel
             , lives = lives
@@ -1001,11 +1026,11 @@ ui =
                     tileSize : Float
                     tileSize =
                         ((windowHeight |> Pixels.toFloat)
-                            + (case flip of
-                                True ->
+                            + (case upside of
+                                Down ->
                                     20
 
-                                False ->
+                                Up ->
                                     -20
                               )
                         )
@@ -1014,11 +1039,11 @@ ui =
                   in
                   SvgA.transform
                     [ Svg.Scale tileSize tileSize
-                    , case flip of
-                        True ->
+                    , case upside of
+                        Down ->
                             Svg.Scale 1 -1
 
-                        False ->
+                        Up ->
                             Svg.Translate 0 0
                     ]
                 ]
@@ -1037,22 +1062,7 @@ ui =
                         )
                     ]
                 ]
-        , [ Svg.rect
-                [ SvgA.fill (Svg.Paint Color.black)
-                , SvgA.width (Svg.percent 100)
-                , SvgA.height (Svg.percent 6)
-                ]
-                []
-          , Svg.rect
-                [ SvgA.fill (Svg.Paint Color.black)
-                , SvgA.width (Svg.percent 100)
-                , SvgA.height (Svg.percent 8)
-                , SvgA.y (Svg.percent 94)
-                ]
-                []
-          ]
-            |> Svg.g
-                []
+        , bars
         ]
             |> Svg.g
                 []
@@ -1194,31 +1204,40 @@ playerUi =
             |> Svg.g []
 
 
+xIndices =
+    N.until n63
+
+
+yIndices =
+    N.until n31
+
+
 sceneUi : Scene -> Svg event_
 sceneUi =
     \scene ->
-        ArraySized.until n63
-            |> ArraySized.map
+        xIndices
+            |> Stack.toList
+            |> List.map
                 (\x ->
-                    let
-                        column =
-                            scene |> ArraySized.element ( Up, x )
-                    in
-                    ArraySized.until n31
-                        |> ArraySized.map
-                            (\y ->
-                                column
-                                    |> ArraySized.element ( Up, y )
-                                    |> tileUi
-                                    |> List.singleton
-                                    |> Svg.g
-                                        [ SvgA.transform
-                                            [ Svg.Translate (x |> N.toFloat) (y |> N.toFloat) ]
-                                        ]
+                    (scene |> ArraySized.element ( Up, x ))
+                        |> Svg.lazy
+                            (\column ->
+                                yIndices
+                                    |> Stack.toList
+                                    |> List.map
+                                        (\y ->
+                                            column
+                                                |> ArraySized.element ( Up, y )
+                                                |> tileUi
+                                                |> List.singleton
+                                                |> Svg.g
+                                                    [ SvgA.transform
+                                                        [ Svg.Translate (x |> N.toFloat) (y |> N.toFloat) ]
+                                                    ]
+                                        )
+                                    |> Svg.g []
                             )
                 )
-            |> ArraySized.toList
-            |> List.concatMap ArraySized.toList
             |> Svg.g
                 [ SvgA.transform
                     [ Svg.Translate -32 -16
@@ -1256,8 +1275,8 @@ tileUi =
 
 tile1Color color =
     Svg.rect
-        [ SvgA.width (Svg.px 1.03)
-        , SvgA.height (Svg.px 1.02)
+        [ SvgA.width (Svg.px 1.026)
+        , SvgA.height (Svg.px 1.017)
         , SvgA.fill (Svg.Paint color)
         ]
         []
@@ -1268,7 +1287,7 @@ trunkUi trunkSpecific =
 
 
 airUi airSpecific =
-    tile1Color (rgba 1 1 1 0)
+    Svg.g [] []
 
 
 groundUi groundSpecific =
