@@ -654,44 +654,53 @@ reactTo event =
                                         Just belowCollision ->
                                             let
                                                 consTry ( x, y ) =
-                                                    -- TODO: remove `Err`
-                                                    (::) ( x |> N.in_ ( n0, n63 ), y |> N.in_ ( n0, n31 ) )
+                                                    case ( x, y ) of
+                                                        ( Ok xOk, Ok yOk ) ->
+                                                            (::) ( xOk, yOk )
+
+                                                        ( Err _, Ok _ ) ->
+                                                            identity
+
+                                                        ( Ok _, Err _ ) ->
+                                                            identity
+
+                                                        ( Err _, Err _ ) ->
+                                                            identity
 
                                                 shoveled =
-                                                    case current.shovel of
-                                                        Block ->
-                                                            [] |> consTry ( belowCollision.x, belowCollision.y )
+                                                    []
+                                                        |> consTry
+                                                            ( belowCollision.x |> Ok
+                                                            , belowCollision.y |> Ok
+                                                            )
+                                                        |> (case current.shovel of
+                                                                Block ->
+                                                                    identity
 
-                                                        Line ->
-                                                            []
-                                                                |> consTry ( belowCollision.x, belowCollision.y )
-                                                                |> consTry
-                                                                    ( belowCollision.x
-                                                                    , belowCollision.y |> N.atLeast n1 |> N.sub n1
-                                                                    )
-                                                                |> consTry
-                                                                    ( belowCollision.x
-                                                                    , belowCollision.y |> N.atLeast n2 |> N.sub n2
-                                                                    )
+                                                                Line ->
+                                                                    consTry
+                                                                        ( belowCollision.x |> Ok
+                                                                        , belowCollision.y |> N.isAtLeast n1 |> Result.map (N.minSub n1)
+                                                                        )
+                                                                        >> consTry
+                                                                            ( belowCollision.x |> Ok
+                                                                            , belowCollision.y |> N.isAtLeast n2 |> Result.map (N.minSub n2)
+                                                                            )
 
-                                                        Circle ->
-                                                            []
-                                                                |> consTry
-                                                                    ( belowCollision.x |> N.atLeast n1 |> N.sub n1
-                                                                    , belowCollision.y
-                                                                    )
-                                                                |> consTry
-                                                                    ( belowCollision.x
-                                                                    , belowCollision.y |> N.atLeast n1 |> N.sub n1
-                                                                    )
-                                                                |> consTry
-                                                                    ( belowCollision.x
-                                                                    , belowCollision.y
-                                                                    )
-                                                                |> consTry
-                                                                    ( belowCollision.x |> N.add n1
-                                                                    , belowCollision.y
-                                                                    )
+                                                                Circle ->
+                                                                    consTry
+                                                                        ( belowCollision.x |> N.isAtLeast n1 |> Result.map (N.minSub n1)
+                                                                        , belowCollision.y |> Ok
+                                                                        )
+                                                                        >> consTry
+                                                                            ( belowCollision.x |> Ok
+                                                                            , belowCollision.y |> N.isAtLeast n1 |> Result.map (N.minSub n1)
+                                                                            )
+                                                                        >> consTry
+                                                                            ( belowCollision.x |> N.add n1 |> N.minDown n1 |> N.isAtMost n63
+                                                                            , belowCollision.y |> Ok
+                                                                            )
+                                                           )
                                             in
                                             { scene =
                                                 shoveled
