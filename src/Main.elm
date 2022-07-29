@@ -33,6 +33,7 @@ import Length exposing (Meters)
 import LineSegment2d exposing (LineSegment2d)
 import Linear exposing (DirectionLinear(..))
 import List.Extra as List
+import List.Linear
 import N exposing (Exactly, Fixed, In, Min, N, N0, n0, n1, n2, n3)
 import Ns exposing (N31, N32, N63, N64, n31, n32, n62, n63, n64)
 import Pixels exposing (Pixels, PixelsPerSecond)
@@ -651,70 +652,74 @@ reactTo event =
                                 dig =
                                     case belowCollide of
                                         Just belowCollision ->
-                                            { scene =
-                                                case current.shovel of
-                                                    Block ->
-                                                        current.scene
-                                                            |> ArraySized.elementAlter ( Up, belowCollision.x )
-                                                                (ArraySized.elementAlter ( Up, belowCollision.y )
-                                                                    (\_ -> Air ())
-                                                                )
+                                            let
+                                                consTry ( x, y ) =
+                                                    -- TODO: remove `Err`
+                                                    (::) ( x |> N.in_ ( n0, n63 ), y |> N.in_ ( n0, n31 ) )
 
-                                                    Line ->
-                                                        current.scene
-                                                            |> ArraySized.elementAlter ( Up, belowCollision.x )
-                                                                (ArraySized.elementAlter ( Up, belowCollision.y )
-                                                                    (\_ -> Air ())
-                                                                )
-                                                            |> ArraySized.elementAlter ( Up, belowCollision.x )
-                                                                (ArraySized.elementAlter
-                                                                    ( Up
+                                                shoveled =
+                                                    case current.shovel of
+                                                        Block ->
+                                                            [] |> consTry ( belowCollision.x, belowCollision.y )
+
+                                                        Line ->
+                                                            []
+                                                                |> consTry ( belowCollision.x, belowCollision.y )
+                                                                |> consTry
+                                                                    ( belowCollision.x
                                                                     , belowCollision.y |> N.atLeast n1 |> N.sub n1
                                                                     )
-                                                                    (\_ -> Air ())
-                                                                )
-                                                            |> ArraySized.elementAlter ( Up, belowCollision.x )
-                                                                (ArraySized.elementAlter
-                                                                    ( Up
+                                                                |> consTry
+                                                                    ( belowCollision.x
                                                                     , belowCollision.y |> N.atLeast n2 |> N.sub n2
                                                                     )
-                                                                    (\_ -> Air ())
-                                                                )
 
-                                                    Circle ->
-                                                        current.scene
-                                                            |> ArraySized.elementAlter
-                                                                ( Up
-                                                                , belowCollision.x |> N.atLeast n1 |> N.sub n1
-                                                                )
-                                                                (ArraySized.elementAlter ( Up, belowCollision.y )
-                                                                    (\_ -> Air ())
-                                                                )
-                                                            |> ArraySized.elementAlter ( Up, belowCollision.x )
-                                                                (ArraySized.elementAlter
-                                                                    ( Up
+                                                        Circle ->
+                                                            []
+                                                                |> consTry
+                                                                    ( belowCollision.x |> N.atLeast n1 |> N.sub n1
+                                                                    , belowCollision.y
+                                                                    )
+                                                                |> consTry
+                                                                    ( belowCollision.x
                                                                     , belowCollision.y |> N.atLeast n1 |> N.sub n1
                                                                     )
+                                                                |> consTry
+                                                                    ( belowCollision.x
+                                                                    , belowCollision.y
+                                                                    )
+                                                                |> consTry
+                                                                    ( belowCollision.x |> N.add n1
+                                                                    , belowCollision.y
+                                                                    )
+                                            in
+                                            { scene =
+                                                shoveled
+                                                    |> List.Linear.foldFrom
+                                                        ( current.scene
+                                                        , Up
+                                                        , \( x, y ) ->
+                                                            ArraySized.elementAlter ( Up, x )
+                                                                (ArraySized.elementAlter ( Up, y )
                                                                     (\_ -> Air ())
                                                                 )
-                                                            |> ArraySized.elementAlter ( Up, belowCollision.x )
-                                                                (ArraySized.elementAlter ( Up, belowCollision.y )
-                                                                    (\_ -> Air ())
-                                                                )
-                                                            |> ArraySized.elementAlter
-                                                                ( Up
-                                                                , belowCollision.x |> N.add n1
-                                                                )
-                                                                (ArraySized.elementAlter ( Up, belowCollision.y )
-                                                                    (\_ -> Air ())
-                                                                )
+                                                        )
                                             , dice =
-                                                case belowCollision.tile of
-                                                    Dice () ->
-                                                        1
+                                                shoveled
+                                                    |> List.map
+                                                        (\( x, y ) ->
+                                                            case
+                                                                current.scene
+                                                                    |> ArraySized.element ( Up, x )
+                                                                    |> ArraySized.element ( Up, y )
+                                                            of
+                                                                Collidable (Dice ()) ->
+                                                                    1
 
-                                                    _ ->
-                                                        0
+                                                                _ ->
+                                                                    0
+                                                        )
+                                                    |> List.sum
                                             }
 
                                         Nothing ->
