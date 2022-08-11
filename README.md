@@ -1,6 +1,6 @@
 # dice digging
 
-**[play](https://lue-bird.github.io/gmtk-2022/)**
+**[play](https://lue-bird.github.io/dice-digging/)**
 
 Find dices throughout the world, destroy them as fast as possible.
 Collecting changes the game rules.
@@ -11,7 +11,7 @@ on the theme "roll of the dice"
 
 > incomplete
 
-**[play](https://lue-bird.github.io/gmtk-2022/)**
+**[play](https://lue-bird.github.io/dice-digging/)**
 
 ### run locally
 
