@@ -531,83 +531,81 @@ reactTo event _ deprecatedState =
                                 Just direction ->
                                     vector2dMapX
                                         (Quantity.plus
-                                            (Pixels.float
+                                            ((Pixels.float
+                                                >> Quantity.per Duration.second
+                                             )
                                                 (case direction of
                                                     Left ->
-                                                        -0.7
+                                                        -1.0
 
                                                     Right ->
-                                                        0.7
+                                                        1.0
                                                 )
-                                                |> Quantity.per Duration.second
                                             )
                                         )
                                         >> vector2dMapX
                                             (Quantity.clamp
-                                                (Pixels.float -4.9 |> Quantity.per Duration.second)
-                                                (Pixels.float 4.9 |> Quantity.per Duration.second)
+                                                (Pixels.float -12 |> Quantity.per Duration.second)
+                                                (Pixels.float 12 |> Quantity.per Duration.second)
                                             )
                            )
                         |> updatedMoveY
             in
             AppStep.to current
                 |> AppStep.alter (\r -> { r | playerSpeed = playerSpeedUpdated })
-                |> (if willBeBelowScene then
-                        AppStep.alter
-                            (\r ->
-                                { r
-                                    | playerPosition =
-                                        Point2d.fromRecord Pixels.float { x = 0, y = 32 }
-                                    , lives = current.lives - 1
-                                }
-                            )
+                |> AppStep.alter
+                    (if willBeBelowScene then
+                        \r ->
+                            { r
+                                | playerPosition =
+                                    Point2d.fromRecord Pixels.float { x = 0, y = 32 }
+                                , lives = current.lives - 1
+                            }
 
-                    else
-                        AppStep.alter
-                            (\r ->
-                                { r
-                                    | playerPosition =
-                                        current.playerPosition
-                                            |> (case belowCollide of
-                                                    Nothing ->
-                                                        identity
+                     else
+                        \r ->
+                            { r
+                                | playerPosition =
+                                    current.playerPosition
+                                        |> (case belowCollide of
+                                                Nothing ->
+                                                    identity
 
-                                                    Just _ ->
-                                                        point2dMapY
-                                                            (Quantity.ceiling
-                                                                >> Quantity.toFloatQuantity
-                                                                >> Quantity.minus (Pixels.float 0.5)
-                                                            )
-                                               )
-                                            |> (case xCollide .xLeft of
-                                                    Nothing ->
-                                                        identity
+                                                Just _ ->
+                                                    point2dMapY
+                                                        (Quantity.ceiling
+                                                            >> Quantity.toFloatQuantity
+                                                            >> Quantity.minus (Pixels.float 0.5)
+                                                        )
+                                           )
+                                        |> (case xCollide .xLeft of
+                                                Nothing ->
+                                                    identity
 
-                                                    Just _ ->
-                                                        point2dMapX
-                                                            (Quantity.floor
-                                                                >> Quantity.toFloatQuantity
-                                                                >> Quantity.plus (Pixels.float 0.5)
-                                                            )
-                                               )
-                                            |> (case xCollide .xRight of
-                                                    Nothing ->
-                                                        identity
+                                                Just _ ->
+                                                    point2dMapX
+                                                        (Quantity.floor
+                                                            >> Quantity.toFloatQuantity
+                                                            >> Quantity.plus (Pixels.float 0.5)
+                                                        )
+                                           )
+                                        |> (case xCollide .xRight of
+                                                Nothing ->
+                                                    identity
 
-                                                    Just _ ->
-                                                        point2dMapX
-                                                            (Quantity.ceiling
-                                                                >> Quantity.toFloatQuantity
-                                                                >> Quantity.minus (Pixels.float 0.5)
-                                                            )
-                                               )
-                                            |> Point2d.translateBy
-                                                (playerSpeedUpdated
-                                                    |> Vector2d.for delta
-                                                )
-                                }
-                            )
-                   )
+                                                Just _ ->
+                                                    point2dMapX
+                                                        (Quantity.ceiling
+                                                            >> Quantity.toFloatQuantity
+                                                            >> Quantity.minus (Pixels.float 0.5)
+                                                        )
+                                           )
+                                        |> Point2d.translateBy
+                                            (playerSpeedUpdated
+                                                |> Vector2d.for delta
+                                            )
+                            }
+                    )
                 |> AppStep.alter
                     (\r ->
                         let
@@ -1016,7 +1014,7 @@ shovelRandom currentShovel =
 
 gravity : Vector2d (Rate (Rate Pixels Seconds) Seconds) coordinates_
 gravity =
-    Vector2d.pixels 0 -18
+    Vector2d.pixels 0 -48
         |> Vector2d.per Duration.second
         |> Vector2d.per Duration.second
 
@@ -1034,24 +1032,19 @@ yIndices =
 
 
 htmlUi : AudioData -> State -> Html Event
-htmlUi audioData =
+htmlUi _ =
     \state ->
-        case state.digBlockSound of
-            Err error ->
-                Html.text (error |> Debug.toString)
-
-            Ok _ ->
-                state
-                    |> ui
-                    |> List.singleton
-                    |> svg
-                        [ SvgA.viewBox
-                            0
-                            0
-                            (state.windowWidth |> Pixels.toFloat)
-                            ((state.windowHeight |> Pixels.toFloat) - 10)
-                        , Html.style "width" "100%"
-                        ]
+        state
+            |> ui
+            |> List.singleton
+            |> svg
+                [ SvgA.viewBox
+                    0
+                    0
+                    (state.windowWidth |> Pixels.toFloat)
+                    ((state.windowHeight |> Pixels.toFloat) - 10)
+                , Html.style "width" "100%"
+                ]
 
 
 background : Svg event_
@@ -1188,23 +1181,14 @@ playerUi =
         let
             after =
                 speed
-                    |> Vector2d.for (Duration.seconds 0.15)
+                    |> Vector2d.for (Duration.seconds 0.01)
 
-            stretch =
-                Vector2d.unitless 0.37 0.37
-                    |> Vector2d.plus
-                        (after
-                            |> Vector2d.normalize
-                            |> vector2dMapX Quantity.abs
-                            |> vector2dMapY Quantity.abs
-                            |> Vector2d.scaleBy
-                                (after
-                                    |> Vector2d.length
-                                    |> Quantity.min (Pixels.float 0.26)
-                                    |> Quantity.max (Pixels.float -0.26)
-                                    |> Pixels.toFloat
-                                )
-                        )
+            stretchY =
+                after
+                    |> Vector2d.yComponent
+                    |> Quantity.abs
+                    |> Quantity.negate
+                    |> Quantity.min (Pixels.float 0.12)
 
             beforeY =
                 0.5
@@ -1273,10 +1257,14 @@ playerUi =
         , arm { x = -0.5 }
         , let
             height =
-                stretch |> Vector2d.yComponent |> Quantity.toFloat
+                Pixels.float 0.8
+                    |> Quantity.plus stretchY
+                    |> Pixels.toFloat
 
             width =
-                stretch |> Vector2d.xComponent |> Quantity.toFloat
+                Pixels.float 0.38
+                    |> Quantity.minus (stretchY |> Quantity.multiplyBy 0.7)
+                    |> Pixels.toFloat
           in
           Svg.ellipse
             [ SvgA.rx (Svg.px width)
