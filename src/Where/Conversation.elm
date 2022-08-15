@@ -453,7 +453,7 @@ Now play the other cool jam games :)""" ]
                   , [ [ Text """Maybe it was better to give the AI what it wanted?""" ]
                     ]
                   )
-                , AiToldStory
+                , Start
                 )
             )
 
