@@ -9090,7 +9090,7 @@ var $author$project$Where$Conversation$conversation = A3(
 		F2(
 			function (_v53, _v54) {
 				return _Utils_Tuple2(
-					$author$project$Where$Conversation$You,
+					$author$project$Where$Conversation$Ai,
 					_List_fromArray(
 						[
 							_Utils_Tuple2(
@@ -9102,7 +9102,7 @@ var $author$project$Where$Conversation$conversation = A3(
 							_Utils_Tuple2(
 							_List_fromArray(
 								[
-									$author$project$Where$Conversation$Text('You, the one playing the game.\nNow play the other cool jam games :)')
+									$author$project$Where$Conversation$Text('You, the one playing the game:\nNow play the other cool jam games :)')
 								]),
 							$author$project$Where$Conversation$EndingCooperative),
 							_Utils_Tuple2(
@@ -9110,7 +9110,13 @@ var $author$project$Where$Conversation$conversation = A3(
 								[
 									$author$project$Where$Conversation$Text('___switch off `interface-human`___')
 								]),
-							$author$project$Where$Conversation$EndingCooperative)
+							$author$project$Where$Conversation$EndingCooperative),
+							_Utils_Tuple2(
+							_List_fromArray(
+								[
+									$author$project$Where$Conversation$Text('___re<<cover friend from game school simulation___')
+								]),
+							$author$project$Where$Conversation$ServerAskedForAiStory)
 						]));
 			}),
 		A3(
@@ -11335,7 +11341,7 @@ var $author$project$Main$reactTo = F2(
 				return A2(
 					$ianmackenzie$elm_units$Quantity$greaterThan,
 					$ianmackenzie$elm_units$Duration$seconds(
-						1.2 + (0.7 * $lue_bird$elm_emptiness_typed$Scroll$length(predetermined.possibilities))),
+						0.92 + (0.85 * $lue_bird$elm_emptiness_typed$Scroll$length(predetermined.possibilities))),
 					predetermined.fullWatchDuration) ? function (state) {
 					return A2(
 						$author$project$AppStep$commandsAdd,
@@ -11351,7 +11357,7 @@ var $author$project$Main$reactTo = F2(
 											state: predetermined.state
 										});
 								},
-								$elm$core$Process$sleep(700))
+								$elm$core$Process$sleep(640))
 							]),
 						$author$project$AppStep$to(
 							_Utils_update(
