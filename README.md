@@ -1,17 +1,13 @@
 # where!
 
 - **[play](https://lue-bird.github.io/where/)**
-- [itch](https://lue-bird.itch.io/where)
+- [itch](https://lue-bird.itch.io/where/play)
 
 A short text game about making interfaces type-safe
 
 Originally made for [Wowie Game Jam 4.0](https://itch.io/jam/wowie-jam-4)
 on the theme "collaborate with AI"
 (submitted)
-
-> incomplete
-
-**[play](https://lue-bird.github.io/where/)**
 
 ### run locally
 
