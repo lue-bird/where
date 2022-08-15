@@ -1,7 +1,7 @@
 # where!
 
-- **[play](https://lue-bird.github.io/where/)**
-- [itch](https://lue-bird.itch.io/where/play)
+- **[play](https://lue-bird.github.io/where/play)**
+- [itch](https://lue-bird.itch.io/where/)
 
 A short text game about making interfaces type-safe
 
