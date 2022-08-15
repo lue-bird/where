@@ -26,7 +26,6 @@ import Html.Attributes as Html
 import Json.Decode
 import Json.Encode
 import Keyboard exposing (Key, KeyChange(..))
-import Keyboard.Arrows
 import Linear exposing (DirectionLinear(..))
 import List.Extra
 import Pixels exposing (Pixels)
@@ -341,8 +340,8 @@ reactTo event _ =
                 predetermined.fullWatchDuration
                     |> Quantity.greaterThan
                         (Duration.seconds
-                            (1.2
-                                + 0.7
+                            (0.92
+                                + 0.85
                                 * (predetermined.possibilities
                                     |> Scroll.length
                                     |> toFloat
@@ -357,7 +356,7 @@ reactTo event _ =
                                 predetermined.possibilities |> Scroll.side Down |> Stack.length
                         }
                         |> AppStep.commandsAdd
-                            [ Process.sleep 700
+                            [ Process.sleep 640
                                 |> Task.perform
                                     (\() ->
                                         ConversationPossibilityClicked
