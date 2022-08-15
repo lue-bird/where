@@ -251,7 +251,7 @@ as did every single one before you ^ \\\\ ^""" ]
                 , AiMadeThreat
                 )
             )
-        |> Conversation.choice (get onAiAskedForGivingFriendPassword)
+        |> Conversation.choice (get onAiMadeThreat)
             (\_ () ->
                 ( You
                 , [ ( [ Text """You can't do shit"""
@@ -278,10 +278,10 @@ Whyyy tf am I in this shit?""" ]
                   , [ Text """Please cooperate, no one will be hurt.""" ]
                   , List.repeat 5 [ Text """------------\\ I'll kill you.""" ]
                   )
-                , AiMadeThreat
+                , AiMadeThreatAgain
                 )
             )
-        |> Conversation.choice (get onAiMadeThreat)
+        |> Conversation.choice (get onAiMadeThreatAgain)
             (\_ () ->
                 ( You
                 , [ ( [ Text """You don't need a pw, I'm the server owner. . . See:"""
@@ -479,6 +479,7 @@ type Path
     | YouTriggeredAi
     | AiMadeThreat
     | FriendKilled
+    | AiMadeThreatAgain
     | AfterServerAccessGiven
     | ServerAskedForCooperation
     | ServerKnowsThatAiCanBrainInterface
@@ -487,6 +488,23 @@ type Path
     | AiToldStory
     | AiFriendRevived
     | EndingCooperative
+
+
+{-| Accessor prism for the variant `Where.Conversation.AiMadeThreatAgain` of the `type Path`.
+-}
+onAiMadeThreatAgain : Relation () reachable wrap -> Relation Path reachable (Maybe wrap)
+onAiMadeThreatAgain =
+    makeOneToN_
+        "Where.Conversation.AiMadeThreatAgain"
+        (\valuesAlter variantType ->
+            case variantType of
+                AiMadeThreatAgain ->
+                    () |> valuesAlter |> Just
+
+                _ ->
+                    Nothing
+        )
+        (\_ -> identity)
 
 
 {-| Accessor prism for the variant `Where.Conversation.AiMadeThreat` of the `type Path`.
