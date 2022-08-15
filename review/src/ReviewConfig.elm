@@ -32,6 +32,7 @@ import NoUnused.Patterns
 import NoUnused.Variables
 import Review.Rule as Rule exposing (Rule)
 import Simplify
+import VariantHelper.GenerateUsed
 
 
 config : List Rule
@@ -56,4 +57,13 @@ config =
     , NoUnused.Patterns.rule
     , NoUnused.Variables.rule
     , Simplify.rule Simplify.defaults
+    --
+    , VariantHelper.GenerateUsed.rule
+        { build =
+            VariantHelper.GenerateUsed.accessors
+                { valuesCombined = VariantHelper.GenerateUsed.valuesRecord }
+        , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+        , nameInModuleExternal = VariantHelper.GenerateUsed.variant
+        , generationModuleIsVariantModuleDotSuffix = "On"
+        }
     ]

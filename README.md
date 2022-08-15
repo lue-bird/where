@@ -1,17 +1,17 @@
-# dice digging
+# where!
 
-**[play](https://lue-bird.github.io/dice-digging/)**
+- **[play](https://lue-bird.github.io/where/)**
+- [itch](https://lue-bird.itch.io/where)
 
-Find dices throughout the world, destroy them as fast as possible.
-Collecting changes the game rules.
+A short text game about making interfaces type-safe
 
-Originally made for GMTK Game Jam 2022
-on the theme "roll of the dice"
-(not submitted)
+Originally made for [Wowie Game Jam 4.0](https://itch.io/jam/wowie-jam-4)
+on the theme "collaborate with AI"
+(submitted)
 
 > incomplete
 
-**[play](https://lue-bird.github.io/dice-digging/)**
+**[play](https://lue-bird.github.io/where/)**
 
 ### run locally
 
@@ -20,7 +20,7 @@ on the theme "roll of the dice"
 npm install
 npm run dev
 ```
-then point your browser to <http://localhost:3000>
+then point your browser to <http://localhost:3000/where/>
 
 See
   - <https://github.com/hmsk/vite-plugin-elm>

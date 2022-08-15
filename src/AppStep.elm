@@ -1,13 +1,15 @@
 module AppStep exposing
-    ( to
-    , alter
-    , withCommand, withAudioCommand
+    ( AppStep
+    , to
+    , map, eventMap
+    , commandsAdd, audioCommandsAdd
     , audioCommand, command, state
     , toTuple
-    , AppStep
     )
 
 {-|
+
+@docs AppStep
 
 
 ## create
@@ -17,8 +19,8 @@ module AppStep exposing
 
 ## alter
 
-@docs alter
-@docs withCommand, withAudioCommand
+@docs map, eventMap
+@docs commandsAdd, audioCommandsAdd
 
 
 ## scan
@@ -37,8 +39,8 @@ import Audio exposing (AudioCmd)
 
 type alias AppStep state event =
     { state : state
-    , command : Cmd (state -> event)
-    , audioCommand : AudioCmd (state -> event)
+    , commands : List (Cmd event)
+    , audioCommands : List (AudioCmd event)
     }
 
 
@@ -47,58 +49,113 @@ state =
     .state
 
 
-command : AppStep state event -> Cmd (state -> event)
+{-| All [`commands`](#commands) `batch`ed
+-}
+command : AppStep state event -> Cmd event
 command =
-    .command
+    commands >> Cmd.batch
 
 
-audioCommand : AppStep state event -> AudioCmd (state -> event)
+commands : AppStep state event -> List (Cmd event)
+commands =
+    .commands
+
+
+{-| All [`audioCommands`](#audioCommands) batched
+-}
+audioCommand : AppStep state event -> AudioCmd event
 audioCommand =
-    .audioCommand
+    audioCommands >> Audio.cmdBatch
+
+
+audioCommands : AppStep state event -> List (AudioCmd event)
+audioCommands =
+    .audioCommands
 
 
 to : state -> AppStep state event_
 to stateAltered =
     { state = stateAltered
-    , command = Cmd.none
-    , audioCommand = Audio.cmdNone
+    , commands = []
+    , audioCommands = []
     }
 
 
-alter : (state -> state) -> AppStep state event -> AppStep state event
-alter stateAlter =
+map :
+    (state -> stateMapped)
+    ->
+        (AppStep state event
+         -> AppStep stateMapped event
+        )
+map stateMap =
     \step ->
-        to (step |> state |> stateAlter)
-            |> withCommand (step |> command)
-            |> withAudioCommand (step |> audioCommand)
+        to (step |> state |> stateMap)
+            |> commandsAdd (step |> commands)
+            |> audioCommandsAdd (step |> audioCommands)
 
 
-withAudioCommand : AudioCmd (state -> event) -> (AppStep state event -> AppStep state event)
-withAudioCommand audioCommandAdditional =
+{-| Transform the events produced by each command and audio command.
+Very similar to `Svg`/.../[`Html.map`](https://guide.elm-lang.org/webapps/structure.html).
+
+Rarely useful in well-structured code,
+so definitely read the [section on structure in the guide](https://guide.elm-lang.org/webapps/structure.html) before reaching for this!
+
+-}
+eventMap :
+    (event -> eventMapped)
+    ->
+        (AppStep state event
+         -> AppStep state eventMapped
+        )
+eventMap eventChange =
+    \step ->
+        to (step |> state)
+            |> commandsAdd
+                (step
+                    |> commands
+                    |> List.map (Cmd.map eventChange)
+                )
+            |> audioCommandsAdd
+                (step
+                    |> audioCommands
+                    |> List.map (Audio.cmdMap eventChange)
+                )
+
+
+audioCommandsAdd :
+    List (AudioCmd event)
+    -> (AppStep state event -> AppStep state event)
+audioCommandsAdd audioCommandAdditional =
     \step ->
         { state = step |> state
-        , command = step |> command
-        , audioCommand =
-            [ step |> audioCommand
-            , audioCommandAdditional
-            ]
-                |> Audio.cmdBatch
+        , commands = step |> commands
+        , audioCommands =
+            (step |> audioCommands)
+                ++ audioCommandAdditional
         }
 
 
-withCommand : Cmd (state -> event) -> (AppStep state event -> AppStep state event)
-withCommand commandAdditional =
+commandsAdd :
+    List (Cmd event)
+    -> (AppStep state event -> AppStep state event)
+commandsAdd commandAdditional =
     \step ->
         { state = step |> state
-        , command =
-            [ step |> command
-            , commandAdditional
-            ]
-                |> Cmd.batch
-        , audioCommand = step |> audioCommand
+        , commands =
+            (step |> commands)
+                ++ commandAdditional
+        , audioCommands = step |> audioCommands
         }
 
 
+{-| Last step before giving your init/update functions to the audio app:
+3-tuple from
+
+  - [`state`](#state)
+  - [`command`](#command)
+  - [`audioCommand`](#audioCommand)
+
+-}
 toTuple :
     AppStep state event
     ->
@@ -109,10 +166,6 @@ toTuple :
 toTuple =
     \step ->
         ( step |> state
-        , step
-            |> command
-            |> Cmd.map (\f -> f (step |> state))
-        , step
-            |> audioCommand
-            |> Audio.cmdMap (\f -> f (step |> state))
+        , step |> command
+        , step |> audioCommand
         )
