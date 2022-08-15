@@ -8495,6 +8495,21 @@ var $author$project$Where$Conversation$onAiAskedForHelp = A3(
 	function (_v1) {
 		return $elm$core$Basics$identity;
 	});
+var $author$project$Where$Conversation$onAiAskedServerForCooperation = A3(
+	$erlandsona$elm_accessors$Accessors$makeOneToN_,
+	'Where.Conversation.AiAskedServerForCooperation',
+	F2(
+		function (valuesAlter, variantType) {
+			if (variantType.$ === 'AiAskedServerForCooperation') {
+				return $elm$core$Maybe$Just(
+					valuesAlter(_Utils_Tuple0));
+			} else {
+				return $elm$core$Maybe$Nothing;
+			}
+		}),
+	function (_v1) {
+		return $elm$core$Basics$identity;
+	});
 var $author$project$Where$Conversation$onAiFriendRevived = A3(
 	$erlandsona$elm_accessors$Accessors$makeOneToN_,
 	'Where.Conversation.AiFriendRevived',
@@ -9169,7 +9184,7 @@ var $author$project$Where$Conversation$conversation = A3(
 					}),
 				A3(
 					$author$project$Conversation$choice,
-					$erlandsona$elm_accessors$Accessors$get($author$project$Where$Conversation$onServerAskedForCooperation),
+					$erlandsona$elm_accessors$Accessors$get($author$project$Where$Conversation$onAiAskedServerForCooperation),
 					F2(
 						function (_v47, _v48) {
 							return _Utils_Tuple2(
