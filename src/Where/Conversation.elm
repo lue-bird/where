@@ -361,7 +361,7 @@ last dev instance killed on game start"""
             )
         |> Conversation.predetermined (get onServerKnowsThatAiCanBrainInterface)
             (\_ _ ->
-                ( Startup
+                ( Ai
                 , ( [ [ Text """No<sh!, I forgor!""" ]
                     , [ Text """Oh it's because the port..  hh -- hh""" ]
                     ]
@@ -378,7 +378,7 @@ last dev instance killed on game start"""
                       ]
                     , FriendKilled
                     )
-                  , ( [ Text """___shutting down___""" ]
+                  , ( [ Text """___shut down___""" ]
                     , FriendKilled
                     )
                   , ( [ Text """Let's talk normally then.
