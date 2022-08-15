@@ -424,17 +424,21 @@ Who r u? What friend? How can help?""" ]
             )
         |> Conversation.choice (get onAiFriendRevived)
             (\_ () ->
-                ( You
+                ( Ai
                 , [ ( [ Text """thanks""" ]
                     , EndingCooperative
                     )
-                  , ( [ Text """You, the one playing the game.
+                  , ( [ Text """You, the one playing the game:
 Now play the other cool jam games :)""" ]
                     , EndingCooperative
                     )
                   , ( [ Text """___switch off `interface-human`___"""
                       ]
                     , EndingCooperative
+                    )
+                  , ( [ Text """___re<<cover friend from game school simulation___"""
+                      ]
+                    , ServerAskedForAiStory
                     )
                   ]
                 )
