@@ -371,7 +371,7 @@ last dev instance killed on game start"""
                 , AiAskedServerForCooperation
                 )
             )
-        |> Conversation.choice (get onServerAskedForCooperation)
+        |> Conversation.choice (get onAiAskedServerForCooperation)
             (\_ () ->
                 ( Startup
                 , [ ( [ Text """___open tunnel `interface-human`___"""
@@ -488,6 +488,23 @@ type Path
     | AiToldStory
     | AiFriendRevived
     | EndingCooperative
+
+
+{-| Accessor prism for the variant `Where.Conversation.AiAskedServerForCooperation` of the `type Path`.
+-}
+onAiAskedServerForCooperation : Relation () reachable wrap -> Relation Path reachable (Maybe wrap)
+onAiAskedServerForCooperation =
+    makeOneToN_
+        "Where.Conversation.AiAskedServerForCooperation"
+        (\valuesAlter variantType ->
+            case variantType of
+                AiAskedServerForCooperation ->
+                    () |> valuesAlter |> Just
+
+                _ ->
+                    Nothing
+        )
+        (\_ -> identity)
 
 
 {-| Accessor prism for the variant `Where.Conversation.AiMadeThreatAgain` of the `type Path`.
